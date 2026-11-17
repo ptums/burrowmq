@@ -1,0 +1,53 @@
+# Publishes @burrowmq/sdk to npm with trusted publishing.
+# GitHub gives this job a short-lived identity token (OIDC), and npm trusts this repo and this
+# workflow file. No npm token is stored anywhere.
+#
+# Each version is staged on npm and goes live only after a maintainer approves it with 2FA.
+#
+# Release: set the version in sdk/package.json, merge to main, then push a tag:
+#   git tag sdk-v0.1.0 && git push origin sdk-v0.1.0
+# The tag must match the version in sdk/package.json, or the job stops.
+name: Release SDK
+
+on:
+  push:
+    tags: ["sdk-v*"]
+
+permissions:
+  contents: read
+  id-token: write # needed for trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm # a GitHub environment, so a release can require approval
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+          cache-dependency-path: sdk/pnpm-lock.yaml
+      - name: Use an npm that supports staged publishing (11.15 or later)
+        run: npm install -g npm@11
+      - name: Tag matches the package version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "sdk-v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match sdk/package.json version $version"
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+      - run: pnpm run build
+      # The trusted publisher on npm is stage-only, so npm publish would be rejected.
+      # The version waits on npm until a maintainer approves it with 2FA: npm stage approve <id>
+      - name: Stage the release on npm
+        run: npm stage publish --access public
