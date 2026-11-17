@@ -1,0 +1,78 @@
+# CI for Burrow. Runs on every pull request and on each push to main.
+# A red check means: do not merge.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: No secrets in the repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No key or badge files are tracked
+        run: |
+          files=$(git ls-files | grep -iE '\.(creds|key|nk|pem)$' || true)
+          if [ -n "$files" ]; then
+            echo "These files must never be in the repo:"
+            echo "$files"
+            exit 1
+          fi
+      - name: No private keys or NATS seeds in any tracked file
+        run: |
+          # PEM private keys, and NATS nkey seeds (user, account, operator).
+          if git grep -nE 'BEGIN [A-Z ]*PRIVATE KEY|\bS[UAO]A[A-Z2-7]{50,}' -- . ':!.github/workflows/ci.yml'; then
+            echo "A private key or NATS seed is in the repo. Remove it and rotate it."
+            exit 1
+          fi
+
+  go:
+    name: burrow-sync (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sync
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sync/go.mod
+          cache-dependency-path: sync/go.sum
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Run gofmt -w on these files:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      - name: go build
+        run: go build -o /dev/null .
+
+  sdk:
+    name: SDK (TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: sdk/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+

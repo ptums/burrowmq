@@ -1,0 +1,58 @@
+{
+  "name": "@burrowmq/sdk",
+  "version": "0.1.1",
+  "description": "Offline-first messaging for edge devices. send() saves each message on the device, and burrow-sync moves it to the cloud when the link allows.",
+  "license": "Apache-2.0",
+  "homepage": "https://burrowmq.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ptums/burrowmq.git",
+    "directory": "sdk"
+  },
+  "bugs": "https://github.com/ptums/burrowmq/issues",
+  "keywords": [
+    "offline-first",
+    "edge",
+    "iot",
+    "nats",
+    "jetstream",
+    "store-and-forward",
+    "agents"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "examples/quickstart.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "prepack": "npm run build",
+    "try": "tsx try.ts",
+    "kiosk": "tsx examples/kiosk.ts"
+  },
+  "dependencies": {
+    "nats": "2.29.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
