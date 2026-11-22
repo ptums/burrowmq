@@ -4,7 +4,8 @@
 // Each reading:
 //   1. Read the CPU temperature and load from Linux.
 //   2. Ask the on-site model (Ollama): normal, warning or alert?
-//      If the model does not answer, use simple rules instead.
+//      Simple rules also judge every reading, and the stricter verdict wins (a guardrail):
+//      the model can raise the level, but never lower it below the rules.
 //   3. Save the reading in the bulk lane. If it is an alert, also save it in the critical lane.
 //
 // Run it next to a Burrow device server: node field-agent.mjs
@@ -132,10 +133,18 @@ while (running) {
   const started = Date.now();
   const r = await readSensors();
 
+  // The guardrail: a model must not be the last word on safety. Take the stricter verdict.
   const fromModel = await askModel(r);
-  const verdict = fromModel ?? rules(r);
-  const source = fromModel ? "model" : "rules";
-  const reading = { ...r, verdict, source };
+  const fromRules = rules(r);
+  let verdict = fromRules;
+  let source = "rules";
+  if (fromModel !== null && VERDICTS.indexOf(fromModel) >= VERDICTS.indexOf(fromRules)) {
+    verdict = fromModel;
+    source = "model";
+  } else if (fromModel !== null) {
+    source = "rules overrode model"; // the model said something milder than the rules allow
+  }
+  const reading = { ...r, verdict, source, model: fromModel, rules: fromRules };
 
   try {
     // Every reading is a log, in the bulk lane.
