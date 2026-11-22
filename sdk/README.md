@@ -37,6 +37,8 @@ Built on [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream). Apache 
 
 A full example is in `examples/quickstart.mjs`.
 
+`examples/field-agent.mjs` is a small AI agent for a Linux device. It reads the CPU temperature and load, asks an on-site model (Ollama) whether each reading is normal, a warning or an alert, and falls back to simple rules when the model does not answer. Readings go in the bulk lane, and alerts also go in the critical lane.
+
 ## API
 
 ### `Burrow.connect(options)`
