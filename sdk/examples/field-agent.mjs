@@ -14,6 +14,8 @@
 //   OLLAMA_URL    the on-site model server    (default "http://localhost:11434")
 //   OLLAMA_MODEL  the model                   (default "qwen2.5:7b")
 //   EVERY_MS      time between readings, ms   (default 5000)
+//   FAKE_TEMP_C   for tests only: report this CPU temperature instead of the real one,
+//                 so you can force the alert path on a device that never gets that hot
 import { readFile, readdir } from "node:fs/promises";
 import { cpus, loadavg } from "node:os";
 import { Burrow } from "@burrowmq/sdk";
@@ -23,6 +25,7 @@ const URL = process.env.BURROW_URL ?? "nats://localhost:4223";
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
 const MODEL = process.env.OLLAMA_MODEL ?? "qwen2.5:7b";
 const EVERY_MS = Number(process.env.EVERY_MS ?? 5000);
+const FAKE_TEMP_C = process.env.FAKE_TEMP_C === undefined ? null : Number(process.env.FAKE_TEMP_C);
 const MODEL_TIMEOUT_MS = 15000; // a slow model is treated as no model
 const VERDICTS = ["normal", "warning", "alert"];
 
@@ -54,12 +57,19 @@ async function cpuTempC() {
 }
 
 async function readSensors() {
-  return {
+  const reading = {
     at: new Date().toISOString(),
     tempC: await cpuTempC(),
     load1m: loadavg()[0],
     cores: cpus().length,
   };
+  // Fault injection at the sensor: fake the input, and test the real path behind it.
+  // The reading says it is fake, so nobody in the cloud mistakes it for a real alarm.
+  if (FAKE_TEMP_C !== null && Number.isFinite(FAKE_TEMP_C)) {
+    reading.tempC = FAKE_TEMP_C;
+    reading.fake = true;
+  }
+  return reading;
 }
 
 // Simple rules: hot is bad, and a load far above the number of cores is a warning.
@@ -87,7 +97,8 @@ async function askModel(r) {
     const res = await fetch(`${OLLAMA_URL}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: MODEL, prompt, stream: false }),
+      // temperature 0: the same reading always gets the same answer.
+      body: JSON.stringify({ model: MODEL, prompt, stream: false, options: { temperature: 0 } }),
       signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
     });
     if (!res.ok) {
@@ -103,6 +114,9 @@ async function askModel(r) {
 
 const burrow = await Burrow.connect({ site: SITE, url: URL });
 console.log(`field agent started on ${SITE}: a reading every ${EVERY_MS} ms, model ${MODEL} at ${OLLAMA_URL}`);
+if (FAKE_TEMP_C !== null) {
+  console.log(`TEST MODE: every reading reports a fake CPU temperature of ${FAKE_TEMP_C} C`);
+}
 
 let running = true;
 let readings = 0;
@@ -140,7 +154,7 @@ while (running) {
   }
 
   const temp = r.tempC === null ? "n/a" : `${r.tempC.toFixed(1)} C`;
-  console.log(`${r.at} temp ${temp}, load ${r.load1m.toFixed(2)} -> ${verdict} (${source})`);
+  console.log(`${r.at} temp ${temp}${r.fake ? " (fake)" : ""}, load ${r.load1m.toFixed(2)} -> ${verdict} (${source})`);
 
   const wait = EVERY_MS - (Date.now() - started);
   if (running && wait > 0) {
