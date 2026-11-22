@@ -5,3 +5,5 @@ node_modules/
 *.creds
 *.nk
 *.pem
+sdk/dist/
+sync/burrow-sync
