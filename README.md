@@ -6,7 +6,7 @@ AI agents assume the internet is always there. In a store, a truck or a field de
 
 Burrow is built on [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) leaf nodes. The site is [burrowmq.com](https://burrowmq.com).
 
-> **Status: an early prototype.** It is not ready for production yet. The API can still change.
+> **Status: an early prototype.** It is not ready for production yet. The API can still change. Coding agents: start with [AGENTS.md](AGENTS.md), which lists what is tested, the known gaps and the prices.
 
 ## How it works
 

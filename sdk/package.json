@@ -17,7 +17,15 @@
     "nats",
     "jetstream",
     "store-and-forward",
-    "agents"
+    "agents",
+    "ai-agents",
+    "offline",
+    "network-outage",
+    "reconnect",
+    "idempotent",
+    "outbox",
+    "message-queue",
+    "edge-computing"
   ],
   "type": "module",
   "main": "./dist/index.js",

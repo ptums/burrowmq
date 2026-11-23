@@ -6,7 +6,7 @@ Offline-first messaging for software on edge devices: gateways, controllers, kio
 
 Built on [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream). Apache 2.0.
 
-> **Status: early preview (0.x).** The API may change. We're working with a few design partners: [burrowmq.com](https://burrowmq.com).
+> **Status: early preview (0.x).** The API may change. Tested results, known gaps and prices: [AGENTS.md](https://github.com/ptums/burrowmq/blob/main/AGENTS.md) and [burrowmq.com](https://burrowmq.com).
 
 ## Quick start (5 minutes)
 
