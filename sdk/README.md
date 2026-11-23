@@ -48,6 +48,7 @@ A full example is in `examples/quickstart.mjs`.
 | `site` | (required) | The name of this device, for example `"store042"`. Letters, digits, `-` and `_` |
 | `url` | `BURROW_URL`, or `nats://localhost:4222` | The NATS server on the device |
 | `setup` | `true` | Create the 2 lanes on the device if they are missing. It never changes lanes that exist |
+| `bulkMaxBytes` | 5 GB | Disk cap for the bulk lane, set when the lane is made. When it is full, the oldest bulk messages are dropped. The critical lane has no cap and is never dropped. `0` means no cap |
 
 ### `burrow.send(lane, topic, data, options?)`
 
@@ -63,6 +64,37 @@ Returns `{ id, seq, duplicate }`.
 ### `burrow.close()`
 
 Sends anything still in flight to the device, then closes the connection.
+
+## Disk use on the device
+
+A message stays on the device only until the hub confirms it. The lanes use work-queue retention: once burrow-sync forwards a message and the hub acks it, it leaves the device disk. A waiting message takes about 370 bytes of disk for 200 bytes of data. A long outage fills at most `bulkMaxBytes` of bulk, plus the critical backlog.
+
+## Upgrading from 0.1.2 or older
+
+SDK 0.1.2 and older made the lanes with `limits` retention. Those lanes keep every message they have ever sent, so the device disk only grows (about 640 MB a day at 20 messages a second) until sends fail. NATS can't change retention on a lane that exists, and `connect()` never changes existing lanes. Instead it logs a warning that names the old lanes.
+
+To fix a device, run `migrateLanes()` once, with burrow-sync running and the hub reachable:
+
+```js
+import { connect } from "nats";
+import { migrateLanes } from "@burrowmq/sdk";
+
+const nc = await connect({ servers: "nats://localhost:4222" });
+console.log(await migrateLanes(await nc.jetstreamManager(), "device01")); // [ "CRITICAL", "BULK" ]
+await nc.close();
+```
+
+For each old lane it does 3 things:
+
+1. Stops new messages from entering the lane. While it waits, `send()` to that lane throws, so retry it with the same `id`.
+2. Waits until burrow-sync has sent and the hub has confirmed every message in the lane. The default wait is 10 minutes (`timeoutMs`).
+3. Deletes the lane and makes it again with work-queue retention, the bulk cap and burrow-sync's `sync` consumer.
+
+If a lane still has messages waiting when time runs out, `migrateLanes()` puts the lane back as it was and throws. It never deletes a lane with messages waiting. Lanes already on work-queue retention are skipped, so running it twice is safe. A running burrow-sync carries on with the new lanes, with no restart.
+
+## Changes
+
+- **0.2.0.** Lanes use work-queue retention, so a message leaves the device disk once the hub confirms it (it was kept forever before). The bulk lane is capped at 5 GB by default (`bulkMaxBytes`), and the oldest bulk is dropped first. New: `migrateLanes()` for lanes made by 0.1.2 or older, and a warning when such lanes are found.
 
 ## How the device reaches the cloud
 

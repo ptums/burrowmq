@@ -1,6 +1,6 @@
 {
   "name": "@burrowmq/sdk",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Offline-first messaging for edge devices. send() saves each message on the device, and burrow-sync moves it to the cloud when the link allows.",
   "license": "Apache-2.0",
   "homepage": "https://burrowmq.com",
